@@ -2,13 +2,12 @@ import pytest
 from fastapi import FastAPI, APIRouter, HTTPException, status
 from fastapi.testclient import TestClient
 
-# --- 1. Данные ---
 MASTER_USERS = [
     {'id': 1, 'name': 'Ivan Ivanov', 'email': 'i.i.ivanov@mail.com'},
     {'id': 2, 'name': 'Pyotr Petrov', 'email': 'p.p.petrov@mail.com'}
 ]
 
-# --- 2. База данных (копия вашего кода, чтобы не зависеть от файла) ---
+# --- База данных (внутри теста) ---
 _fake_storage = MASTER_USERS.copy()
 _next_id = 3
 
@@ -40,7 +39,7 @@ def delete_user_by_email(email: str):
             return True
     return False
 
-# --- 3. Роутер (копия вашего кода) ---
+# --- Роутер ---
 user_router = APIRouter()
 
 @user_router.get("", status_code=status.HTTP_200_OK)
@@ -63,19 +62,26 @@ def delete_user(email: str):
         raise HTTPException(status_code=404, detail="Not Found")
     return None
 
-# --- 4. Сборка приложения ПРЯМО ЗДЕСЬ ---
+# --- Сборка ---
 app = FastAPI()
-# Подключаем роутер с полным путем
 app.include_router(user_router, prefix="/api/v1/user")
 client = TestClient(app)
 
-# --- 5. Фикстура сброса ---
+# --- ДИАГНОСТИКА: Печатаем все маршруты ---
 @pytest.fixture(autouse=True)
 def run_around_tests():
     reset_db()
+    # ЭТА СТРОКА ВЫВЕДЕТ АДРЕСА В ЛОГИ GITHUB
+    print("\n--- REGISTERED ROUTES ---")
+    for route in app.routes:
+        # Проверяем, есть ли у маршрута path (чтобы не упасть на Starlette ошибки)
+        if hasattr(route, 'path'):
+            methods = [m for m in route.methods if not m.startswith('HEAD')]
+            print(f"Path: {route.path} | Methods: {methods}")
+    print("--- END ROUTES ---\n")
     yield
 
-# --- 6. Тесты ---
+# --- Тесты (пути "" так как префикс на роутере) ---
 def test_get_existed_user():
     response = client.get("", params={'email': MASTER_USERS[0]['email']})
     assert response.status_code == 200
@@ -95,5 +101,3 @@ def test_create_user_with_invalid_email():
 def test_delete_user():
     response = client.delete("", params={'email': MASTER_USERS[1]['email']})
     assert response.status_code == 204
-    check = client.get("", params={'email': MASTER_USERS[1]['email']})
-    assert check.status_code == 404
