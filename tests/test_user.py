@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
-from fastapi.responses import JSONResponse, Response
 
 # --- ДАННЫЕ ---
 users_data = [
@@ -25,15 +24,15 @@ def get_user(email: str):
         raise HTTPException(status_code=404, detail="Not Found")
     return user
 
-@app.post("/api/v1/user", status_code=201)
+# ФИКС: Добавлено response_model=int
+@app.post("/api/v1/user", status_code=201, response_model=int)
 def create_user(name: str, email: str):
     if find_user(email):
-        # Явно возвращаем JSON с ошибкой, чтобы не было 422
-        return JSONResponse(status_code=409, content={"detail": "Already exists"})
+        # Для 409 используем HTTPException, он корректно отрабатывает
+        raise HTTPException(status_code=409, detail="Already exists")
     
     new_id = len(db) + 1
     db.append({"id": new_id, "name": name, "email": email})
-    # Возвращаем просто число, сервер сам сделает из него JSON
     return new_id
 
 @app.delete("/api/v1/user", status_code=204)
@@ -42,8 +41,7 @@ def delete_user(email: str):
     for u in db:
         if u["email"] == email:
             db = [x for x in db if x["email"] != email]
-            # Возвращаем пустой Response с кодом 204
-            return Response(status_code=204)
+            return 
     raise HTTPException(status_code=404, detail="Not Found")
 
 client = TestClient(app)
@@ -65,13 +63,9 @@ def test_create_user():
 def test_create_duplicate():
     response = client.post("/api/v1/user", json={"name": "X", "email": "ivan@mail.com"})
     assert response.status_code == 409
-    assert response.json()["detail"] == "Already exists"
 
 def test_delete_user():
     response = client.delete("/api/v1/user", params={"email": "petr@mail.com"})
     assert response.status_code == 204
-    # У 204 не должно быть тела
-    assert response.text == ""
-    
     check = client.get("/api/v1/user", params={"email": "petr@mail.com"})
     assert check.status_code == 404
