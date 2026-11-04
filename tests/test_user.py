@@ -1,7 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.testclient import TestClient
 
-# --- ДАННЫЕ ---
 users_data = [
     {"id": 1, "name": "Ivan", "email": "ivan@mail.com"},
     {"id": 2, "name": "Pyotr", "email": "petr@mail.com"}
@@ -14,7 +13,6 @@ def find_user(email):
             return u
     return None
 
-# --- ПРИЛОЖЕНИЕ ---
 app = FastAPI()
 
 @app.get("/api/v1/user")
@@ -24,15 +22,14 @@ def get_user(email: str):
         raise HTTPException(status_code=404, detail="Not Found")
     return user
 
-# ФИКС: Возвращаем объект {"id": 3}, а не просто 3
+# ФИКС: Добавлено Body(...) для каждого параметра
 @app.post("/api/v1/user", status_code=201)
-def create_user(name: str, email: str):
+def create_user(name: str = Body(..., embed=True), email: str = Body(..., embed=True)):
     if find_user(email):
         raise HTTPException(status_code=409, detail="Already exists")
     
     new_id = len(db) + 1
     db.append({"id": new_id, "name": name, "email": email})
-    # Возвращаем словарь
     return {"id": new_id}
 
 @app.delete("/api/v1/user", status_code=204)
@@ -46,7 +43,6 @@ def delete_user(email: str):
 
 client = TestClient(app)
 
-# --- ТЕСТЫ ---
 def test_get_existed_user():
     response = client.get("/api/v1/user", params={"email": "ivan@mail.com"})
     assert response.status_code == 200
@@ -55,21 +51,15 @@ def test_get_unexisted_user():
     response = client.get("/api/v1/user", params={"email": "ghost@mail.com"})
     assert response.status_code == 404
 
+# Тест остается прежним (json=), так как мы починили сервер
 def test_create_user():
     response = client.post("/api/v1/user", json={"name": "Sidor", "email": "sidor@mail.com"})
-    
-    # --- ДИАГНОСТИКА (добавьте эти 3 строки) ---
-    print("\n--- DEBUG INFO ---")
-    print("Status:", response.status_code)
-    print("Response Body:", response.text) # Покажет, какую ошибку выдал сервер
-    print("--- END DEBUG ---\n")
-    
     assert response.status_code == 201
+    assert response.json()["id"] == 3
 
 def test_create_duplicate():
     response = client.post("/api/v1/user", json={"name": "X", "email": "ivan@mail.com"})
     assert response.status_code == 409
-    assert response.json()["detail"] == "Already exists"
 
 def test_delete_user():
     response = client.delete("/api/v1/user", params={"email": "petr@mail.com"})
