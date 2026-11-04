@@ -24,16 +24,16 @@ def get_user(email: str):
         raise HTTPException(status_code=404, detail="Not Found")
     return user
 
-# ФИКС: Добавлено response_model=int
-@app.post("/api/v1/user", status_code=201, response_model=int)
+# ФИКС: Возвращаем объект {"id": 3}, а не просто 3
+@app.post("/api/v1/user", status_code=201)
 def create_user(name: str, email: str):
     if find_user(email):
-        # Для 409 используем HTTPException, он корректно отрабатывает
         raise HTTPException(status_code=409, detail="Already exists")
     
     new_id = len(db) + 1
     db.append({"id": new_id, "name": name, "email": email})
-    return new_id
+    # Возвращаем словарь
+    return {"id": new_id}
 
 @app.delete("/api/v1/user", status_code=204)
 def delete_user(email: str):
@@ -58,11 +58,13 @@ def test_get_unexisted_user():
 def test_create_user():
     response = client.post("/api/v1/user", json={"name": "Sidor", "email": "sidor@mail.com"})
     assert response.status_code == 201
-    assert response.json() == 3
+    # Проверяем словарь
+    assert response.json() == {"id": 3}
 
 def test_create_duplicate():
     response = client.post("/api/v1/user", json={"name": "X", "email": "ivan@mail.com"})
     assert response.status_code == 409
+    assert response.json()["detail"] == "Already exists"
 
 def test_delete_user():
     response = client.delete("/api/v1/user", params={"email": "petr@mail.com"})
