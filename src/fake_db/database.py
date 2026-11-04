@@ -13,6 +13,7 @@ def reset_db():
     _next_id = 3
 
 def get_user_by_email(email: str):
+    print(f"[DEBUG] DB: Searching for email={email}. Current DB state: {_users}")
     for user in _users:
         if user['email'] == email:
             return user
