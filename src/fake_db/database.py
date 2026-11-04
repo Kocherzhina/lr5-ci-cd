@@ -1,44 +1,42 @@
-from typing import Dict, List, Union
+# src/fake_db/database.py
+_USERS_DATA = [
+    {'id': 1, 'name': 'Ivan Ivanov', 'email': 'i.i.ivanov@mail.com'},
+    {'id': 2, 'name': 'Pyotr Petrov', 'email': 'p.p.petrov@mail.com'}
+]
 
-class Database:
-    def __init__(self):
-        self._users: List[Dict[str, Union[int, str, bool]]] = [
-            {
-                'id': 1,
-                'name': 'Ivan Ivanov',
-                'email': 'i.i.ivanov@mail.com',
-            },
-            {
-                'id': 2,
-                'name': 'Petr Petrov',
-                'email': 'p.p.petrov@mail.com',
-            }
-        ]
+_users = _USERS_DATA.copy()
+_next_id = 3
 
-        self._id = len(self._users)
+def reset_db():
+    global _users, _next_id
+    _users = _USERS_DATA.copy()
+    _next_id = 3
 
-    def get_user_by_email(self, email: str):
-        for user in self._users:
-            if user['email'] == email:
-                return user
+def get_user_by_email(email: str):
+    for user in _users:
+        if user['email'] == email:
+            return user
+    return None
+
+def create_user(name: str, email: str):
+    global _next_id
+    if get_user_by_email(email) is not None:
         return None
+    user = {'id': _next_id, 'name': name, 'email': email}
+    _users.append(user)
+    _next_id += 1
+    return user
 
-    def create_user(self, name: str, email: str):
-        self._id += 1
-        self._users.append(
-            {
-                'id': self._id,
-                'name': name,
-                'email': email,
-                'activated': False
-            }
-        )
+def delete_user_by_email(email: str):
+    global _users
+    for user in _users:
+        if user['email'] == email:
+            _users.remove(user)
+            return True
+    return False
 
-    def delete_user_by_email(self, email: str):
-        for user in self._users:
-            if user['email'] == email:
-                self._users.remove(user)
-                return
-
-
-db = Database()
+db = type('DB', (), {
+    'get_user_by_email': staticmethod(get_user_by_email),
+    'create_user': staticmethod(create_user),
+    'delete_user_by_email': staticmethod(delete_user_by_email)
+})()
